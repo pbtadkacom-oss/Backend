@@ -1,0 +1,167 @@
+const axios = require('axios');
+const cron = require('node-cron');
+const Widget = require('../models/Widget');
+
+const fetchWeatherForCoords = async (lat, lon) => {
+    try {
+        const latFixed = parseFloat(lat).toFixed(4);
+        const lonFixed = parseFloat(lon).toFixed(4);
+        const res = await axios.get(`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${latFixed}&lon=${lonFixed}`, {
+            headers: { 'User-Agent': 'NewsWebPunjabi/1.0' }
+        });
+        const current = res.data.properties.timeseries[0].data.instant.details;
+        const symbol = res.data.properties.timeseries[0].data.next_1_hours?.summary?.symbol_code || '';
+        const mapCondition = (sym) => {
+            if (sym.includes('clear')) return 'CLEAR';
+            if (sym.includes('fair') || sym.includes('cloud')) return 'CLOUDY';
+            if (sym.includes('rain')) return 'RAIN';
+            if (sym.includes('thunder')) return 'THUNDERSTORM';
+            return 'MODERATE';
+        };
+        const temp = current.air_temperature;
+        const hum = current.relative_humidity;
+        const windKmh = Math.round(current.wind_speed * 3.6);
+        let feelsLike = temp;
+        if (temp > 20) feelsLike = temp + (0.1 * hum); 
+
+        return {
+            city: 'Detecting...', 
+            temp: Math.round(temp),
+            feelsLike: Math.round(feelsLike),
+            humidity: Math.round(hum),
+            condition: mapCondition(symbol),
+            warning: `Wind speed: ${windKmh} km/h`
+        };
+    } catch (err) { return null; }
+};
+
+const updateWeather = async () => {
+    try {
+        const data = await fetchWeatherForCoords(30.69, 76.86);
+        if (data) {
+            data.city = 'Panchkula';
+            await Widget.findOneAndUpdate({ type: 'weather' }, { data, lastUpdated: new Date() }, { upsert: true });
+        }
+    } catch (err) {}
+};
+
+const updateMarket = async () => {
+    try {
+        // Only NIFTY and SENSEX as requested
+        const symbols = ['^NSEI', '^BSESN'];
+        
+        const results = await Promise.all(
+            symbols.map(async (sym) => {
+                try {
+                    const res = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=2d`);
+                    const result = res.data.chart.result[0];
+                    const meta = result.meta;
+                    const validCloses = result.indicators.quote[0].close.filter(c => c !== null);
+                    
+                    const price = meta.regularMarketPrice || (validCloses.length > 0 ? validCloses[validCloses.length - 1] : 0);
+                    const prev = meta.previousClose || (validCloses.length > 1 ? validCloses[validCloses.length - 2] : price);
+                    
+                    return { id: sym, price, prev, high: meta.regularMarketDayHigh || price, low: meta.regularMarketDayLow || price };
+                } catch (e) { 
+                    return { id: sym, price: 0, prev: 0, high: 0, low: 0 }; 
+                }
+            })
+        );
+
+        const dataMap = results.reduce((acc, curr) => ({ ...acc, [curr.id]: curr }), {});
+        const marketData = [];
+        const getPct = (p, pr) => (!pr || pr === 0) ? 0 : ((p - pr) / pr) * 100;
+
+        // 1. NIFTY 50
+        const nifty = dataMap['^NSEI'];
+        if (nifty.price > 0) {
+            const pct = getPct(nifty.price, nifty.prev);
+            marketData.push({ 
+                name: 'NIFTY 50', exchange: 'NSE', symbol: '^NSEI', 
+                price: nifty.price.toLocaleString('en-IN', { maximumFractionDigits: 1 }), 
+                change: (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%', 
+                up: pct >= 0,
+                high: nifty.high.toLocaleString('en-IN'),
+                low: nifty.low.toLocaleString('en-IN')
+            });
+        }
+
+        // 2. SENSEX
+        const sensex = dataMap['^BSESN'];
+        if (sensex.price > 0) {
+            const pct = getPct(sensex.price, sensex.prev);
+            marketData.push({ 
+                name: 'SENSEX', exchange: 'BSE', symbol: '^BSESN', 
+                price: sensex.price.toLocaleString('en-IN', { maximumFractionDigits: 1 }), 
+                change: (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%', 
+                up: pct >= 0,
+                high: sensex.high.toLocaleString('en-IN'),
+                low: sensex.low.toLocaleString('en-IN')
+            });
+        }
+
+        if (marketData.length > 0) {
+            await Widget.findOneAndUpdate({ type: 'market' }, { data: marketData, lastUpdated: new Date() }, { upsert: true });
+        }
+    } catch (err) {
+        console.error('Market Update Error:', err.message);
+    }
+};
+
+const updateCricket = async () => {
+    try {
+        const rapidKey = process.env.RAPIDAPI_KEY;
+        if (!rapidKey || rapidKey === 'your_rapidapi_key_here') return;
+
+        const options = {
+            method: 'GET',
+            url: 'https://free-cricbuzz-cricket-api.p.rapidapi.com/cricket-livescores',
+            headers: { 'x-rapidapi-key': rapidKey, 'x-rapidapi-host': 'free-cricbuzz-cricket-api.p.rapidapi.com', 'Content-Type': 'application/json' }
+        };
+
+        const response = await axios.request(options);
+        let rawMatches = (response.data && Array.isArray(response.data.response)) ? response.data.response : [];
+
+        const getFlag = (name) => {
+            const n = name?.toLowerCase() || '';
+            if (n.includes('india') || n.includes('ind')) return 'in';
+            if (n.includes('pak') || n.includes('pakistan')) return 'pk';
+            if (n.includes('aus') || n.includes('australia')) return 'au';
+            if (n.includes('eng') || n.includes('england')) return 'gb';
+            if (n.includes('za') || n.includes('south africa')) return 'za';
+            if (n.includes('nz') || n.includes('new zealand')) return 'nz';
+            if (n.includes('sl') || n.includes('sri lanka')) return 'lk';
+            if (n.includes('ban') || n.includes('bangladesh')) return 'bd';
+            if (n.includes('wi') || n.includes('west indies')) return 'um';
+            if (n.includes('afg') || n.includes('afghanistan')) return 'af';
+            return 'un';
+        };
+
+        const matches = rawMatches.map(m => {
+            let s1 = '-', s2 = '-';
+            if (m.score) {
+                const p = m.score.split(',');
+                s1 = p[0]?.trim() || '-';
+                s2 = p[1]?.trim() || '-';
+            }
+            return {
+                team1: { name: m.team1 || 'Team A', flag: getFlag(m.team1), score: m.team1_score || s1 },
+                team2: { name: m.team2 || 'Team B', flag: getFlag(m.team2), score: m.team2_score || s2 },
+                result: m.status || m.score || 'Live Match'
+            };
+        });
+
+        await Widget.findOneAndUpdate({ type: 'cricket' }, { data: { title: 'Live Cricket', matches }, lastUpdated: new Date() }, { upsert: true });
+    } catch (err) {}
+};
+
+const startWidgetService = () => {
+    updateWeather();
+    updateMarket();
+    setTimeout(updateCricket, 2000);
+    cron.schedule('*/10 * * * *', updateWeather);
+    cron.schedule('*/30 * * * *', updateCricket);
+    cron.schedule('*/1 * * * *', updateMarket);
+};
+
+module.exports = { startWidgetService, fetchWeatherForCoords };

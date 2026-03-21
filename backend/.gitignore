@@ -1,0 +1,6 @@
+node_modules/
+.env
+last_error.txt
+output.txt
+.DS_Store
+Thumbs.db

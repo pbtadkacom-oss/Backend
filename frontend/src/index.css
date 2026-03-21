@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&family=Open+Sans:wght@400;600;700&family=Roboto:wght@400;700;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Montserrat', sans-serif;
+  }
+}
+
+:root {
+  --primary-red: #d32f2f;
+  --secondary-red: #b71c1c;
+  --accent-gold: #ffc107;
+}
+
+body {
+  @apply bg-[#f9f9f9] text-text-dark leading-relaxed;
+}
+
+/* Custom scrollbar for horizontal movie slider */
+.movies-slider::-webkit-scrollbar {
+  height: 8px;
+}
+
+.movies-slider::-webkit-scrollbar-thumb {
+  background-color: var(--primary-red);
+  border-radius: 10px;
+}
+
+/* Rich Text & Layout Fixes */
+.rich-text-content,
+.rich-text-content *,
+.font-article-text,
+.font-article-text *,
+.prose,
+.prose * {
+  overflow-wrap: break-word !important;
+  word-wrap: break-word !important;
+  word-break: normal !important;
+  word-break: keep-all !important; /* Extremely strict non-breaking */
+  hyphens: none !important;
+  -webkit-hyphens: none !important;
+  -moz-hyphens: none !important;
+  -ms-hyphens: none !important;
+  text-align: left !important;
+  white-space: normal !important;
+}
+
+.rich-text-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.rich-text-content p {
+  margin-bottom: 1.5rem;
+}
+
+.rich-text-content h1, .rich-text-content h2, .rich-text-content h3 {
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-style: italic;
+  letter-spacing: -0.05em;
+}
+
+.rich-text-content ul, .rich-text-content ol {
+  margin-bottom: 1.5rem;
+  padding-left: 1.5rem;
+}
+
+.rich-text-content li {
+  margin-bottom: 0.5rem;
+}
+
+/* Ensure flex containers don't overflow */
+.main-content-area {
+  min-width: 0;
+}
+
+/* 404 Page Animations */
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+.animate-scanline {
+  animation: scanline 8s linear infinite;
+}
+
