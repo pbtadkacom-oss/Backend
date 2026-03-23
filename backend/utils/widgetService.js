@@ -53,7 +53,9 @@ const updateMarket = async () => {
         const results = await Promise.all(
             symbols.map(async (sym) => {
                 try {
-                    const res = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=2d`);
+                    const res = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=2d`, {
+                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
+                    });
                     const result = res.data.chart.result[0];
                     const meta = result.meta;
                     const validCloses = result.indicators.quote[0].close.filter(c => c !== null);
@@ -127,7 +129,7 @@ const startWidgetService = () => {
     updateWeather();
     updateMarket();
     cron.schedule('*/10 * * * *', updateWeather);
-    cron.schedule('*/1 * * * *', updateMarket);
+    cron.schedule('*/5 * * * *', updateMarket);
 };
 
 module.exports = { startWidgetService, fetchWeatherForCoords };
