@@ -25,6 +25,29 @@ const Dashboard = () => {
     { name: 'Featured Videos', count: videos.length, icon: 'fas fa-video', color: 'bg-purple-500' },
   ];
 
+  // Derive recent activity from actual data
+  const formatActivityTime = (dateString) => {
+    if (!dateString) return 'Recently';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMs = now - date;
+    const diffInMins = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+    if (diffInMins < 60) return `${diffInMins} mins ago`;
+    if (diffInHours < 24) return `${diffInHours} hours ago`;
+    if (diffInDays === 1) return 'Yesterday';
+    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  };
+
+  const activities = [
+    ...movies.slice(-3).map(m => ({ text: `New Movie: ${m.title}`, time: formatActivityTime(m.createdAt), date: m.createdAt })),
+    ...news.slice(-3).map(n => ({ text: `News Posted: ${n.title}`, time: formatActivityTime(n.createdAt), date: n.createdAt })),
+    ...celebs.slice(-3).map(c => ({ text: `New Celeb: ${c.name}`, time: formatActivityTime(c.createdAt), date: c.createdAt })),
+    ...videos.slice(-3).map(v => ({ text: `Video Added: ${v.title}`, time: formatActivityTime(v.createdAt), date: v.createdAt })),
+  ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+
   return (
     <div>
       <h2 className="text-xl font-bold mb-6 text-text-dark">Dashboard Overview</h2>
@@ -86,9 +109,13 @@ const Dashboard = () => {
             <i className="fas fa-history text-primary-red"></i> Recent Activity
           </h3>
           <ul className="space-y-3">
-            <ActivityItem text="System started successfully" time="Today, 10:24 AM" />
-            <ActivityItem text="Data loaded from local storage" time="Today, 09:15 AM" />
-            <ActivityItem text="Admin logged in from localhost" time="Yesterday, 11:45 PM" />
+            {activities.length > 0 ? (
+              activities.map((act, i) => (
+                <ActivityItem key={i} text={act.text} time={act.time} />
+              ))
+            ) : (
+              <ActivityItem text="No recent activity to show" time="-" />
+            )}
           </ul>
         </div>
         
