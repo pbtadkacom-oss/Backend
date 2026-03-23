@@ -1,5 +1,4 @@
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
 const mongoose = require('mongoose');
 const express = require('express');
 const cors = require('cors');
@@ -15,9 +14,8 @@ connectDB();
 startWidgetService();
 
 // Init Middleware
-app.set('trust proxy', 1); // Trust first proxy (Render)
 app.use(cors({
-    origin: true, // In production, replace with your frontend URL
+    origin: true, // Allow any origin to match the requester
     credentials: true
 }));
 app.use(express.json());
@@ -27,15 +25,10 @@ app.use(session({
     secret: process.env.SESSION_SECRET || 'yoursecretkey',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
-        mongoUrl: process.env.MONGO_URI,
-        collectionName: 'sessions'
-    }),
     cookie: { 
-        secure: true, // Required for HTTPS
-        httpOnly: true,
-        sameSite: 'none', // Required for cross-site cookies (frontend on different domain)
-        maxAge: 24 * 60 * 60 * 1000 
+        secure: false, // Set to true if using HTTPS
+        httpOnly: true, // Prevents client-side JS from reading the cookie
+        maxAge: 24 * 60 * 60 * 1000 // Session expires after 24 hours
     }
 }));
 
