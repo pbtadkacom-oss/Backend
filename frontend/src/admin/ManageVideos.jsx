@@ -3,7 +3,6 @@ import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import { useData } from '../context/DataContext';
 import Modal from '../components/Modal';
-import { API_BASE_URL } from '../config';
 
 const ManageVideos = () => {
     const { user, videos, addVideo, updateVideo, deleteVideo, deleteVideoComment, updateVideoComment } = useData();
@@ -105,7 +104,7 @@ const ManageVideos = () => {
         setShowForm(true);
     };
 
-    const baseUrl = API_BASE_URL;
+    const baseUrl = 'http://localhost:5000';
 
     return (
         <div className="space-y-6 relative">

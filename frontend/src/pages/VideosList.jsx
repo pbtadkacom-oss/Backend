@@ -2,12 +2,11 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import FilterBar from '../components/FilterBar';
 import { useData } from '../context/DataContext';
-import { API_BASE_URL } from '../config';
 
 const VideosList = () => {
     const { videos } = useData();
     const [filter, setFilter] = useState('ALL');
-    const baseUrl = API_BASE_URL;
+    const baseUrl = 'http://localhost:5000';
 
     const industries = ['ALL', ...new Set(videos.map(v => v.industry))];
     const filteredVideos = filter === 'ALL' ? videos : videos.filter(v => v.industry === filter);
