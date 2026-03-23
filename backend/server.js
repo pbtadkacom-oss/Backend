@@ -24,14 +24,17 @@ const startServer = async () => {
         app.use(express.json());
 
         // Session Middleware
+        const store = (typeof MongoStore.create === 'function') 
+            ? MongoStore.create({ mongoUrl: process.env.MONGO_URI, ttl: 14 * 24 * 60 * 60 })
+            : MongoStore.default && typeof MongoStore.default.create === 'function'
+                ? MongoStore.default.create({ mongoUrl: process.env.MONGO_URI, ttl: 14 * 24 * 60 * 60 })
+                : new MongoStore({ mongoUrl: process.env.MONGO_URI, ttl: 14 * 24 * 60 * 60 });
+
         app.use(session({
             secret: process.env.SESSION_SECRET || 'punjabi-film-news-secret-123',
             resave: false,
             saveUninitialized: false,
-            store: MongoStore.create({
-                mongoUrl: process.env.MONGO_URI,
-                ttl: 14 * 24 * 60 * 60 // 14 days
-            }),
+            store: store,
             cookie: { 
                 secure: process.env.NODE_ENV === 'production', // true for HTTPS
                 httpOnly: true,
