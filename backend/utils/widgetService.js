@@ -108,59 +108,11 @@ const updateMarket = async () => {
     }
 };
 
-const updateCricket = async () => {
-    try {
-        const rapidKey = process.env.RAPIDAPI_KEY;
-        if (!rapidKey || rapidKey === 'your_rapidapi_key_here') return;
-
-        const options = {
-            method: 'GET',
-            url: 'https://free-cricbuzz-cricket-api.p.rapidapi.com/cricket-livescores',
-            headers: { 'x-rapidapi-key': rapidKey, 'x-rapidapi-host': 'free-cricbuzz-cricket-api.p.rapidapi.com', 'Content-Type': 'application/json' }
-        };
-
-        const response = await axios.request(options);
-        let rawMatches = (response.data && Array.isArray(response.data.response)) ? response.data.response : [];
-
-        const getFlag = (name) => {
-            const n = name?.toLowerCase() || '';
-            if (n.includes('india') || n.includes('ind')) return 'in';
-            if (n.includes('pak') || n.includes('pakistan')) return 'pk';
-            if (n.includes('aus') || n.includes('australia')) return 'au';
-            if (n.includes('eng') || n.includes('england')) return 'gb';
-            if (n.includes('za') || n.includes('south africa')) return 'za';
-            if (n.includes('nz') || n.includes('new zealand')) return 'nz';
-            if (n.includes('sl') || n.includes('sri lanka')) return 'lk';
-            if (n.includes('ban') || n.includes('bangladesh')) return 'bd';
-            if (n.includes('wi') || n.includes('west indies')) return 'um';
-            if (n.includes('afg') || n.includes('afghanistan')) return 'af';
-            return 'un';
-        };
-
-        const matches = rawMatches.map(m => {
-            let s1 = '-', s2 = '-';
-            if (m.score) {
-                const p = m.score.split(',');
-                s1 = p[0]?.trim() || '-';
-                s2 = p[1]?.trim() || '-';
-            }
-            return {
-                team1: { name: m.team1 || 'Team A', flag: getFlag(m.team1), score: m.team1_score || s1 },
-                team2: { name: m.team2 || 'Team B', flag: getFlag(m.team2), score: m.team2_score || s2 },
-                result: m.status || m.score || 'Live Match'
-            };
-        });
-
-        await Widget.findOneAndUpdate({ type: 'cricket' }, { data: { title: 'Live Cricket', matches }, lastUpdated: new Date() }, { upsert: true });
-    } catch (err) {}
-};
 
 const startWidgetService = () => {
     updateWeather();
     updateMarket();
-    setTimeout(updateCricket, 2000);
     cron.schedule('*/10 * * * *', updateWeather);
-    cron.schedule('*/30 * * * *', updateCricket);
     cron.schedule('*/1 * * * *', updateMarket);
 };
 
