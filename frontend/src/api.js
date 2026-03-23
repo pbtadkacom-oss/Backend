@@ -9,6 +9,7 @@ export const getMe = () => api.get('/auth/me');
 export const logout = () => api.post('/auth/logout');
 export const login = (credentials) => api.post('/auth/login', credentials);
 export const register = (credentials) => api.post('/auth/register', credentials);
+export const verifyRegistration = (data) => api.post('/auth/verify-registration', data);
 
 export const getMovies = () => api.get('/movies');
 export const addMovie = (data) => api.post('/movies', data);

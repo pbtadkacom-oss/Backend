@@ -20,6 +20,8 @@ const UserAuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isVerifyingRegistration, setIsVerifyingRegistration] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
 
   const validatePassword = (pass) => {
     const regex = /^(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/;
@@ -48,13 +50,37 @@ const UserAuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
       } else {
         const res = await register({ username, email, fullName, phone, password });
         if (res.data.success) {
-          setUser(res.data.user);
-          if (onAuthSuccess) onAuthSuccess(res.data);
-          onClose();
+          setVerificationEmail(email);
+          setIsVerifyingRegistration(true);
+          setMessage(res.data.message);
         }
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Authentication failed');
+      if (err.response?.data?.message === 'verification_pending') {
+        setVerificationEmail(err.response.data.email);
+        setIsVerifyingRegistration(true);
+        setError('Please verify your email to complete registration.');
+      } else {
+        setError(err.response?.data?.message || 'Authentication failed');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyRegistration = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    try {
+      const res = await api.post('/auth/verify-registration', { email: verificationEmail, otp });
+      if (res.data.success) {
+        setUser(res.data.user);
+        if (onAuthSuccess) onAuthSuccess(res.data);
+        onClose();
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Verification failed');
     } finally {
       setIsLoading(false);
     }
@@ -218,99 +244,135 @@ const UserAuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
               </div>
             )}
             
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {!isLogin && (
-                <div className="grid grid-cols-1 gap-4">
+              {isVerifyingRegistration ? (
+                <div className="space-y-4 animate-in fade-in duration-500">
+                  <div className="p-4 rounded-xl bg-primary-red/5 border border-primary-red/10 text-center">
+                    <p className="text-[10px] font-black text-primary-red uppercase tracking-widest mb-1">Verification Required</p>
+                    <p className="text-[11px] font-bold text-slate-500">We've sent a 6-digit code to <span className="text-slate-900">{verificationEmail}</span></p>
+                  </div>
                   <div className="group">
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 group-focus-within:text-primary-red">Full Legal Name</label>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 group-focus-within:text-primary-red">Enter OTP</label>
                     <div className="relative">
-                      <i className="fas fa-signature absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary-red text-xs"></i>
+                      <i className="fas fa-key absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary-red text-xs"></i>
                       <input 
                         className="w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary-red/5 focus:bg-white focus:border-primary-red transition-all text-sm font-bold text-slate-900"
-                        placeholder="John Doe"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="000000"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value)}
                         required
                       />
                     </div>
                   </div>
-                  <div className="group">
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 group-focus-within:text-primary-red">Email Archive</label>
-                    <div className="relative">
-                      <i className="fas fa-at absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary-red text-xs"></i>
-                      <input 
-                        className="w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary-red/5 focus:bg-white focus:border-primary-red transition-all text-sm font-bold text-slate-900"
-                        type="email"
-                        placeholder="archive@mail.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="group">
-                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 group-focus-within:text-primary-red">Username or Email</label>
-                <div className="relative">
-                  <i className="fas fa-user-circle absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary-red text-xs"></i>
-                  <input 
-                    className="w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary-red/5 focus:bg-white focus:border-primary-red transition-all text-sm font-bold text-slate-900"
-                    placeholder="Identifier"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="group">
-                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 group-focus-within:text-primary-red">Secret Passphrase</label>
-                <div className="relative">
-                  <i className="fas fa-fingerprint absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary-red text-xs"></i>
-                  <input 
-                    className="w-full pl-11 pr-12 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary-red/5 focus:bg-white focus:border-primary-red transition-all text-sm font-bold text-slate-900"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-primary-red transition-colors p-2">
-                    <i className={`fas fa-eye${showPassword ? '-slash' : ''} text-xs`}></i>
-                  </button>
-                </div>
-              </div>
-
-              <button 
-                type="submit" 
-                disabled={isLoading}
-                className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl hover:bg-primary-red hover:shadow-2xl hover:shadow-primary-red/30 transition-all hover:-translate-y-1 active:translate-y-0 uppercase tracking-widest text-[11px] mt-4 disabled:opacity-50"
-              >
-                {isLoading ? 'Decrypting...' : (isLogin ? 'Sign In Now' : 'Initialize Profile')}
-              </button>
-
-              <div className="flex flex-col items-center space-y-4 pt-6 border-t border-slate-50">
-                <button 
-                  type="button" 
-                  onClick={toggleMode}
-                  className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors"
-                >
-                  {isLogin ? "New here? Create your identity" : "Existing member? Authenticate here"}
-                </button>
-                
-                {isLogin && (
                   <button 
-                    type="button" 
-                    onClick={openForgotPassword}
-                    className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-primary-red transition-colors"
+                    onClick={handleVerifyRegistration}
+                    disabled={isLoading}
+                    className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl hover:bg-primary-red transition-all uppercase tracking-widest text-[11px]"
                   >
-                    Lost your credentials?
+                    {isLoading ? 'Verifying...' : 'Verify & Complete'}
                   </button>
-                )}
-              </div>
-            </form>
+                  <button 
+                    type="button"
+                    onClick={() => setIsVerifyingRegistration(false)}
+                    className="w-full text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 pt-2"
+                  >
+                    Back to Registration
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  {!isLogin && (
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="group">
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 group-focus-within:text-primary-red">Full Legal Name</label>
+                        <div className="relative">
+                          <i className="fas fa-signature absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary-red text-xs"></i>
+                          <input 
+                            className="w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary-red/5 focus:bg-white focus:border-primary-red transition-all text-sm font-bold text-slate-900"
+                            placeholder="John Doe"
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div className="group">
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 group-focus-within:text-primary-red">Email Archive</label>
+                        <div className="relative">
+                          <i className="fas fa-at absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary-red text-xs"></i>
+                          <input 
+                            className="w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary-red/5 focus:bg-white focus:border-primary-red transition-all text-sm font-bold text-slate-900"
+                            type="email"
+                            placeholder="archive@mail.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="group">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 group-focus-within:text-primary-red">Username or Email</label>
+                    <div className="relative">
+                      <i className="fas fa-user-circle absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary-red text-xs"></i>
+                      <input 
+                        className="w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary-red/5 focus:bg-white focus:border-primary-red transition-all text-sm font-bold text-slate-900"
+                        placeholder="Identifier"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="group">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 group-focus-within:text-primary-red">Secret Passphrase</label>
+                    <div className="relative">
+                      <i className="fas fa-fingerprint absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary-red text-xs"></i>
+                      <input 
+                        className="w-full pl-11 pr-12 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary-red/5 focus:bg-white focus:border-primary-red transition-all text-sm font-bold text-slate-900"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                      />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-primary-red transition-colors p-2">
+                        <i className={`fas fa-eye${showPassword ? '-slash' : ''} text-xs`}></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={isLoading}
+                    className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl hover:bg-primary-red hover:shadow-2xl hover:shadow-primary-red/30 transition-all hover:-translate-y-1 active:translate-y-0 uppercase tracking-widest text-[11px] mt-4 disabled:opacity-50"
+                  >
+                    {isLoading ? 'Decrypting...' : (isLogin ? 'Sign In Now' : 'Initialize Profile')}
+                  </button>
+
+                  <div className="flex flex-col items-center space-y-4 pt-6 border-t border-slate-50">
+                    <button 
+                      type="button" 
+                      onClick={toggleMode}
+                      className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors"
+                    >
+                      {isLogin ? "New here? Create your identity" : "Existing member? Authenticate here"}
+                    </button>
+                    
+                    {isLogin && (
+                      <button 
+                        type="button" 
+                        onClick={openForgotPassword}
+                        className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-primary-red transition-colors"
+                      >
+                        Lost your credentials?
+                      </button>
+                    )}
+                  </div>
+                </form>
+              )}
           </div>
         </div>
       </div>

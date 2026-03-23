@@ -37,17 +37,55 @@ router.post('/register', async (req, res) => {
         let userExists = await User.findOne({ $or: [{ username }, { email }] });
         if (userExists) return res.status(400).json({ success: false, message: 'Username or Email already exists' });
 
-        const user = new User({ username, email, fullName, phone, password, role: 'user' });
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const user = new User({ 
+            username, 
+            email, 
+            fullName, 
+            phone, 
+            password, 
+            role: 'user',
+            isVerified: false,
+            otp,
+            otpExpires: Date.now() + 600000 // 10 mins
+        });
+        await user.save();
+
+        // Send OTP Email
+        const { sendOtpEmail } = require('../utils/emailService');
+        await sendOtpEmail(email, otp);
+
+        res.status(201).json({ 
+            success: true, 
+            message: 'Registration successful! Please verify your email with the OTP sent.',
+            email
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Verify Registration OTP
+router.post('/verify-registration', async (req, res) => {
+    const { email, otp } = req.body;
+    try {
+        const user = await User.findOne({ 
+            email, 
+            otp, 
+            otpExpires: { $gt: Date.now() } 
+        });
+
+        if (!user) return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+
+        user.isVerified = true;
+        user.otp = undefined;
+        user.otpExpires = undefined;
         await user.save();
 
         const userData = { id: user._id, username: user.username, role: user.role };
         req.session.user = userData;
 
-        res.status(201).json({ 
-            success: true, 
-            message: 'User registered successfully',
-            user: userData
-        });
+        res.json({ success: true, message: 'Email verified successfully!', user: userData });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -65,9 +103,11 @@ router.post('/forgot-password', async (req, res) => {
         user.otpExpires = Date.now() + 600000; // 10 mins
         await user.save();
 
-        console.log(`[OTP DEBUG] OTP for ${email}: ${otp}`);
+        // Send OTP Email
+        const { sendOtpEmail } = require('../utils/emailService');
+        await sendOtpEmail(email, otp);
         
-        res.json({ success: true, message: 'OTP sent to your email (simulated)' });
+        res.json({ success: true, message: 'OTP sent to your email' });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -119,6 +159,10 @@ router.post('/login', async (req, res) => {
 
         const isMatch = await user.comparePassword(password);
         if (!isMatch) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+
+        if (!user.isVerified) {
+            return res.status(403).json({ success: true, message: 'verification_pending', email: user.email });
+        }
 
         if (user.isBlocked) {
             return res.status(403).json({ success: false, message: 'Your account has been blocked. Please contact support.' });
