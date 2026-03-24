@@ -1,15 +1,33 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
-
 const sendOtpEmail = async (to, otp) => {
+    // Port 465 (SSL) + forcing IPv4 to resolve ENETUNREACH/IPv6 issues on Render
+    const transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true, // SSL
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
+        },
+        // Force IPv4
+        family: 4,
+        tls: {
+            rejectUnauthorized: false
+        },
+        connectionTimeout: 20000,
+        greetingTimeout: 20000,
+        socketTimeout: 20000
+    });
+
+    // Diagnostic check
+    console.log('[Email Service] Config Check:', {
+        hasUser: !!process.env.EMAIL_USER,
+        hasPass: !!process.env.EMAIL_PASS,
+        nodeEnv: process.env.NODE_ENV
+    });
+
     const mailOptions = {
         from: `"PB Tadka" <${process.env.EMAIL_USER}>`,
         to,
@@ -18,7 +36,7 @@ const sendOtpEmail = async (to, otp) => {
             <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px; max-width: 500px; margin: auto;">
                 <h2 style="color: #e11d48; text-align: center;">PB Tadka Verification</h2>
                 <p>Hello,</p>
-                <p>Thank you for joining PB Tadka. Please use the following One-Time Password (OTP) to verify your account:</p>
+                <p>Thank you for choosing PB Tadka. Please use the following One-Time Password (OTP) to proceed:</p>
                 <div style="background: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #333; margin: 20px 0; border-radius: 8px;">
                     ${otp}
                 </div>
@@ -35,7 +53,7 @@ const sendOtpEmail = async (to, otp) => {
         console.log(`[Email Service] OTP sent to ${to}`);
         return true;
     } catch (err) {
-        console.error('[Email Service] Error sending email:', err.message);
+        console.error('[Email Service] Error sending email:', err);
         return false;
     }
 };
